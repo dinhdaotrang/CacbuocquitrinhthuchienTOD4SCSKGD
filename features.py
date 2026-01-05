@@ -673,7 +673,7 @@ def render_file_management():
 
 def init_step_templates_storage(step_num):
     """Initialize storage directory for step template files"""
-    storage_dir = Path(f"step_templates/step_{step_num}")
+    storage_dir = Path(f"step_mauluu/step_{step_num}")
     storage_dir.mkdir(parents=True, exist_ok=True)
     return storage_dir
 
@@ -755,7 +755,7 @@ def delete_step_template_file(step_num, filename, storage_dir):
 
 def init_substep_templates_storage(step_num, substep_code):
     """Initialize storage directory for substep template files"""
-    storage_dir = Path(f"step_templates/step_{step_num}/{substep_code}")
+    storage_dir = Path(f"step_mauluu/step_{step_num}/{substep_code}")
     storage_dir.mkdir(parents=True, exist_ok=True)
     return storage_dir
 
