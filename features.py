@@ -258,6 +258,9 @@ def save_file_info(filename, file_type, storage_dir):
     else:
         metadata = []
     
+    # Remove existing entries with the same filename to avoid duplicates
+    metadata = [m for m in metadata if m.get('filename') != filename]
+    
     # Generate unique ID for this file
     file_id = str(uuid.uuid4())[:8]
     
@@ -684,6 +687,9 @@ def save_step_template_info(step_num, filename, file_type, storage_dir):
     else:
         metadata = []
     
+    # Remove existing entries with the same filename to avoid duplicates
+    metadata = [m for m in metadata if m.get('filename') != filename]
+    
     # Generate unique ID for this file
     file_id = str(uuid.uuid4())[:8]
     
@@ -762,6 +768,9 @@ def save_substep_template_info(step_num, substep_code, filename, file_type, stor
             metadata = json.load(f)
     else:
         metadata = []
+    
+    # Remove existing entries with the same filename to avoid duplicates
+    metadata = [m for m in metadata if m.get('filename') != filename]
     
     # Generate unique ID for this file
     file_id = str(uuid.uuid4())[:8]
@@ -936,25 +945,35 @@ def render_substep_templates(step_num, substep_code):
     metadata = load_substep_template_metadata(storage_dir)
     
     if metadata:
-        # Remove duplicates based on file_path, file_id, AND upload_date to avoid duplicate keys
-        seen_combinations = set()
-        unique_metadata = []
-        for file_info in metadata:
-            file_path = file_info.get('file_path', '')
-            file_id = file_info.get('id', '')
-            upload_date = file_info.get('upload_date', '')
+        # Clean up metadata: remove duplicates and keep only files that actually exist
+        cleaned_metadata = []
+        seen_filenames = set()
+        
+        # Sort by upload_date descending to keep newest first
+        metadata_sorted = sorted(metadata, key=lambda x: x.get('upload_date', ''), reverse=True)
+        
+        for file_info in metadata_sorted:
             filename = file_info.get('filename', '')
+            file_path = Path(file_info.get('file_path', ''))
             
-            # Create a unique combination identifier
-            # Use file_path + upload_date + filename to identify truly unique files
-            unique_identifier = f"{file_path}_{upload_date}_{filename}"
-            if file_id:
-                unique_identifier = f"{file_id}_{upload_date}"
+            # Skip if filename already seen (keep only the first/newest occurrence)
+            if filename in seen_filenames:
+                continue
             
-            if unique_identifier and unique_identifier not in seen_combinations:
-                seen_combinations.add(unique_identifier)
-                unique_metadata.append(file_info)
-        metadata = unique_metadata
+            # Only include if file actually exists
+            if file_path.exists():
+                seen_filenames.add(filename)
+                cleaned_metadata.append(file_info)
+        
+        # Update metadata file if duplicates were removed
+        if len(cleaned_metadata) < len(metadata):
+            metadata_file = storage_dir / "metadata.json"
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(cleaned_metadata, f, ensure_ascii=False, indent=2)
+            st.info(f"🧹 Đã làm sạch metadata: từ {len(metadata)} entries xuống còn {len(cleaned_metadata)} file.")
+            metadata = cleaned_metadata
+        else:
+            metadata = cleaned_metadata
         
         # Reverse to show newest first
         metadata.reverse()
@@ -972,67 +991,50 @@ def render_substep_templates(step_num, substep_code):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Create a hash from all file information to ensure uniqueness
-            file_path_str = str(file_path_obj)
-            filename = file_info.get('filename', '')
-            upload_date = file_info.get('upload_date', '')
-            file_id = file_info.get('id', '')
+            # Generate completely unique UUID for each widget - no combination, just pure UUID
+            # This ensures absolute uniqueness regardless of any other factors
+            download_uuid_full = str(uuid.uuid4()).replace('-', '')
+            delete_uuid_full = str(uuid.uuid4()).replace('-', '')
             
-            # Create unique hash from all file attributes
-            file_hash_input = f"{file_path_str}_{filename}_{upload_date}_{file_id}_{idx}"
-            file_hash = hashlib.sha256(file_hash_input.encode()).hexdigest()[:20]
+            # Use only UUID for key - simplest and most reliable approach
+            download_key = f"dl_{download_uuid_full}"
+            delete_key = f"del_{delete_uuid_full}"
             
-            # Generate keys using hash + counter to ensure uniqueness
-            st.session_state[widget_counter_key] += 1
-            widget_num = st.session_state[widget_counter_key]
-            
-            # Create keys and ensure they're unique
-            download_key = f"dl_{step_num}_{substep_code}_{widget_num}_{file_hash}"
-            delete_key = f"del_{step_num}_{substep_code}_{widget_num}_{file_hash}"
-            
-            # If key already used, add UUID to make it unique
-            if download_key in used_keys:
-                download_uuid = str(uuid.uuid4()).replace('-', '')[:8]
-                download_key = f"{download_key}_{download_uuid}"
-            if delete_key in used_keys:
-                delete_uuid = str(uuid.uuid4()).replace('-', '')[:8]
-                delete_key = f"{delete_key}_{delete_uuid}"
-            
-            # Mark keys as used
-            used_keys.add(download_key)
-            used_keys.add(delete_key)
-            
-            col_info, col_download, col_delete = st.columns([3, 1, 1])
-            
-            with col_info:
-                status_icon = "✅" if file_exists else "⚠️"
-                st.write(f"{status_icon} **{file_info['filename']}** ({file_info['upload_date']})")
-            
-            with col_download:
-                if file_exists:
-                    try:
-                        with open(file_path_obj, 'rb') as f:
-                            file_data = f.read()
-                            # Use counter + UUID for unique key
-                            st.download_button(
-                                label="📥 Tải",
-                                data=file_data,
-                                file_name=file_info['filename'],
-                                mime=file_info.get('file_type', 'application/octet-stream'),
-                                key=download_key,
-                                use_container_width=True
-                            )
-                    except Exception as e:
-                        st.error(f"Không thể đọc file: {str(e)}")
-                        st.button("📥 Tải", key=f"{download_key}_err", disabled=True, use_container_width=True)
-                else:
-                    st.button("📥 Tải", key=f"{download_key}_na", disabled=True, use_container_width=True, help="File không tồn tại")
-            
-            with col_delete:
-                if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
-                    if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
-                        st.success(f"✅ Đã xóa: {file_info['filename']}")
-                        st.rerun()
+            # Use container to isolate each file's widgets
+            with st.container():
+                col_info, col_download, col_delete = st.columns([3, 1, 1])
+                
+                with col_info:
+                    status_icon = "✅" if file_exists else "⚠️"
+                    st.write(f"{status_icon} **{file_info['filename']}** ({file_info['upload_date']})")
+                
+                with col_download:
+                    if file_exists:
+                        try:
+                            with open(file_path_obj, 'rb') as f:
+                                file_data = f.read()
+                                # Use pure UUID for key - guaranteed unique
+                                st.download_button(
+                                    label="📥 Tải",
+                                    data=file_data,
+                                    file_name=file_info['filename'],
+                                    mime=file_info.get('file_type', 'application/octet-stream'),
+                                    key=download_key,
+                                    use_container_width=True
+                                )
+                        except Exception as e:
+                            st.error(f"Không thể đọc file: {str(e)}")
+                            err_uuid = str(uuid.uuid4()).replace('-', '')
+                            st.button("📥 Tải", key=f"err_{err_uuid}", disabled=True, use_container_width=True)
+                    else:
+                        na_uuid = str(uuid.uuid4()).replace('-', '')
+                        st.button("📥 Tải", key=f"na_{na_uuid}", disabled=True, use_container_width=True, help="File không tồn tại")
+                
+                with col_delete:
+                    if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
+                        if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
+                            st.success(f"✅ Đã xóa: {file_info['filename']}")
+                            st.rerun()
 
 def render_step_templates(step_num):
     """Render step template file upload and management section"""
@@ -1211,6 +1213,9 @@ def save_completed_file_info(step_num, filename, file_type, storage_dir, substep
             metadata = json.load(f)
     else:
         metadata = []
+    
+    # Remove existing entries with the same filename to avoid duplicates
+    metadata = [m for m in metadata if m.get('filename') != filename]
     
     # Generate unique ID for this file
     file_id = str(uuid.uuid4())[:8]
