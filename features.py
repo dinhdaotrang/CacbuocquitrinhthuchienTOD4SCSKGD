@@ -963,21 +963,43 @@ def render_substep_templates(step_num, substep_code):
         # Reset counter at start of file list rendering
         st.session_state[widget_counter_key] = 0
         
+        # Track used keys to prevent duplicates - reset each render
+        used_keys_key = f"used_keys_{step_num}_{substep_code}"
+        used_keys = set()  # Create new set each render
+        
         for idx, file_info in enumerate(metadata):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Increment counter for each file to ensure unique sequential numbers
+            # Create a hash from all file information to ensure uniqueness
+            file_path_str = str(file_path_obj)
+            filename = file_info.get('filename', '')
+            upload_date = file_info.get('upload_date', '')
+            file_id = file_info.get('id', '')
+            
+            # Create unique hash from all file attributes
+            file_hash_input = f"{file_path_str}_{filename}_{upload_date}_{file_id}_{idx}"
+            file_hash = hashlib.sha256(file_hash_input.encode()).hexdigest()[:20]
+            
+            # Generate keys using hash + counter to ensure uniqueness
             st.session_state[widget_counter_key] += 1
             widget_num = st.session_state[widget_counter_key]
             
-            # Use counter + UUID for absolute uniqueness
-            download_uuid = str(uuid.uuid4()).replace('-', '')[:12]
-            delete_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+            # Create keys and ensure they're unique
+            download_key = f"dl_{step_num}_{substep_code}_{widget_num}_{file_hash}"
+            delete_key = f"del_{step_num}_{substep_code}_{widget_num}_{file_hash}"
             
-            # Simple, short key using counter and UUID
-            download_key = f"dl_{step_num}_{substep_code}_{widget_num}_{download_uuid}"
-            delete_key = f"del_{step_num}_{substep_code}_{widget_num}_{delete_uuid}"
+            # If key already used, add UUID to make it unique
+            if download_key in used_keys:
+                download_uuid = str(uuid.uuid4()).replace('-', '')[:8]
+                download_key = f"{download_key}_{download_uuid}"
+            if delete_key in used_keys:
+                delete_uuid = str(uuid.uuid4()).replace('-', '')[:8]
+                delete_key = f"{delete_key}_{delete_uuid}"
+            
+            # Mark keys as used
+            used_keys.add(download_key)
+            used_keys.add(delete_key)
             
             col_info, col_download, col_delete = st.columns([3, 1, 1])
             
