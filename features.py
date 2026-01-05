@@ -831,6 +831,11 @@ def render_substep_templates(step_num, substep_code):
     
     storage_dir = init_substep_templates_storage(step_num, substep_code)
     
+    # Initialize widget counter in session state for unique keys
+    widget_counter_key = f"widget_counter_{step_num}_{substep_code}"
+    if widget_counter_key not in st.session_state:
+        st.session_state[widget_counter_key] = 0
+    
     # Upload section
     uploaded_files = st.file_uploader(
         f"Upload file mẫu cho {substep_code}",
@@ -904,14 +909,23 @@ def render_substep_templates(step_num, substep_code):
         # Reverse to show newest first
         metadata.reverse()
         
+        # Reset widget counter at the start of rendering file list
+        st.session_state[widget_counter_key] = 0
+        
         st.markdown(f"*Danh sách file mẫu ({len(metadata)} file):*")
         
         for idx, file_info in enumerate(metadata):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Generate a unique UUID for each widget instance to ensure absolute uniqueness
-            widget_uuid = str(uuid.uuid4())[:12]
+            # Increment widget counter for each file to ensure unique keys
+            st.session_state[widget_counter_key] += 1
+            widget_num = st.session_state[widget_counter_key]
+            
+            # Create a stable unique identifier using file_path hash + widget counter
+            file_path_str = str(file_path_obj)
+            file_path_hash = hashlib.md5(file_path_str.encode()).hexdigest()[:12]
+            unique_id = f"{file_path_hash}_{widget_num}"
             
             col_info, col_download, col_delete = st.columns([3, 1, 1])
             
@@ -922,8 +936,8 @@ def render_substep_templates(step_num, substep_code):
             with col_download:
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
-                        # Use UUID for each widget to ensure absolute uniqueness
-                        unique_key = f"dl_substep_{step_num}_{substep_code}_{widget_uuid}"
+                        # Create unique key using file_path hash + widget counter
+                        unique_key = f"dl_substep_{step_num}_{substep_code}_{unique_id}"
                         st.download_button(
                             label="📥 Tải",
                             data=f.read(),
@@ -934,8 +948,7 @@ def render_substep_templates(step_num, substep_code):
                         )
             
             with col_delete:
-                delete_uuid = str(uuid.uuid4())[:12]
-                delete_key = f"del_substep_{step_num}_{substep_code}_{delete_uuid}"
+                delete_key = f"del_substep_{step_num}_{substep_code}_{unique_id}"
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
