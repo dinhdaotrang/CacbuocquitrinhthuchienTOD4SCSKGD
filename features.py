@@ -38,11 +38,10 @@ except ImportError:
 def sanitize_key(key_string):
     """Sanitize a string to be used as a Streamlit widget key
     Uses hash to ensure uniqueness and avoid duplicate key errors"""
-    # Use hash to ensure key is always unique and valid
-    key_hash = hashlib.md5(key_string.encode()).hexdigest()[:16]
-    # Include part of original string for debugging, but hash ensures uniqueness
-    safe_prefix = key_string.replace('/', '_').replace('\\', '_').replace(':', '_')[:30]
-    return f"{safe_prefix}_{key_hash}"
+    # Use full hash to ensure key is always unique and valid
+    key_hash = hashlib.md5(key_string.encode()).hexdigest()
+    # Use only hash to ensure absolute uniqueness, no prefix to avoid collisions
+    return f"key_{key_hash}"
 
 # ==================== VISUALIZATION FUNCTIONS ====================
 
@@ -438,12 +437,14 @@ def render_file_management():
                     with col_up2:
                         with open(file_path, "rb") as f:
                             file_data = f.read()
+                            key_base = f"download_uploaded_{uploaded_file.name}_{datetime.now().isoformat()}"
+                            unique_key = sanitize_key(key_base)
                             st.download_button(
                                 label="⬇️ Tải xuống file vừa upload",
                                 data=file_data,
                                 file_name=uploaded_file.name,
                                 mime=file_type,
-                                key=f"download_uploaded_{uploaded_file.name}",
+                                key=unique_key,
                                 use_container_width=True
                             )
                     
@@ -464,12 +465,14 @@ def render_file_management():
                             if saved_text_path:
                                 with open(saved_text_path, 'r', encoding='utf-8') as f:
                                     text_data = f.read()
+                                key_base = f"download_text_{uploaded_file.name}_{datetime.now().isoformat()}"
+                                unique_key = sanitize_key(key_base)
                                 st.download_button(
                                     label="💾 Tải xuống nội dung văn bản (.txt)",
                                     data=text_data,
                                     file_name=saved_text_path.name,
                                     mime="text/plain",
-                                    key=f"download_text_{uploaded_file.name}",
+                                    key=unique_key,
                                     use_container_width=True
                                 )
                 else:
@@ -522,12 +525,14 @@ def render_file_management():
                         if file_exists:
                             with open(file_path_obj, "rb") as f:
                                 file_data = f.read()
+                                key_base = f"dl_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                                unique_key = sanitize_key(key_base)
                                 st.download_button(
                                     "⬇️ Tải xuống",
                                     data=file_data,
                                     file_name=file_info['filename'],
                                     mime=file_info['file_type'],
-                                    key=f"dl_{idx}_{file_info['filename']}",
+                                    key=unique_key,
                                     use_container_width=True,
                                     help="Tải xuống file gốc"
                                 )
@@ -554,12 +559,14 @@ def render_file_management():
                             # Text already saved, offer download
                             with open(saved_text_path, 'r', encoding='utf-8') as f:
                                 text_data = f.read()
+                            key_base = f"save_text_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                            unique_key = sanitize_key(key_base)
                             st.download_button(
                                 "💾 Lưu văn bản",
                                 data=text_data,
                                 file_name=saved_text_path.name,
                                 mime="text/plain",
-                                key=f"save_text_{idx}_{file_info['filename']}",
+                                key=unique_key,
                                 use_container_width=True,
                                 help="Tải xuống nội dung văn bản đã lưu"
                             )
@@ -626,12 +633,14 @@ def render_file_management():
                         st.info(f"💾 Nội dung văn bản đã được lưu: {saved_text_path.name}")
                         with open(saved_text_path, 'r', encoding='utf-8') as f:
                             text_data = f.read()
+                        key_base = f"download_text_content_{selected_file}_{datetime.now().isoformat()}"
+                        unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="💾 Tải xuống nội dung văn bản (.txt)",
                             data=text_data,
                             file_name=saved_text_path.name,
                             mime="text/plain",
-                            key=f"download_text_content_{selected_file}",
+                            key=unique_key,
                             use_container_width=True
                         )
                     else:
@@ -885,7 +894,8 @@ def render_substep_templates(step_num, substep_code):
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
                         # Create unique key using hash to avoid duplicate key errors
-                        key_base = f"download_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}"
+                        # Include file_path to ensure uniqueness even if filename is duplicate
+                        key_base = f"download_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
                         unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
@@ -897,7 +907,7 @@ def render_substep_templates(step_num, substep_code):
                         )
             
             with col_delete:
-                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}"
+                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
                 delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
@@ -994,19 +1004,23 @@ def render_step_templates(step_num):
                 if file_exists:
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
+                    key_base = f"dl_template_{step_num}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                    unique_key = sanitize_key(key_base)
                     st.download_button(
                         "⬇️",
                         data=file_data,
                         file_name=file_info['filename'],
                         mime=file_info['file_type'],
-                        key=f"dl_template_{step_num}_{idx}_{file_info['filename']}",
+                        key=unique_key,
                         use_container_width=True,
                         help="Tải xuống"
                     )
                 else:
                     st.button("⬇️", key=f"dl_disabled_{step_num}_{idx}", disabled=True, use_container_width=True, help="File không tồn tại")
                 
-                if st.button("🗑️", key=f"del_template_{step_num}_{idx}_{file_info['filename']}", use_container_width=True, help="Xóa"):
+                del_key_base = f"del_template_{step_num}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                del_key = sanitize_key(del_key_base)
+                if st.button("🗑️", key=del_key, use_container_width=True, help="Xóa"):
                     if delete_step_template_file(step_num, file_info['filename'], storage_dir):
                         st.success(f"✅ Đã xóa file: {file_info['filename']}")
                         st.rerun()
@@ -1182,17 +1196,21 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
             with col_file2:
                 if file_exists:
                     with open(file_path, 'rb') as f:
+                        key_base = f"download_{key_prefix}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                        unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
                             data=f.read(),
                             file_name=file_info['filename'],
                             mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=f"download_{key_prefix}_{idx}_{file_info['filename']}",
+                            key=unique_key,
                             use_container_width=True
                         )
             
             with col_file3:
-                if st.button("🗑️ Xóa", key=f"delete_{key_prefix}_{idx}_{file_info['filename']}", use_container_width=True):
+                delete_key_base = f"delete_{key_prefix}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                delete_key = sanitize_key(delete_key_base)
+                if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_completed_file(step_num, file_info['filename'], storage_dir, substep_code):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
                         st.rerun()
