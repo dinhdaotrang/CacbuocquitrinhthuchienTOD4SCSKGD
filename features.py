@@ -12,6 +12,7 @@ import json
 import os
 import hashlib
 import uuid
+import shutil
 
 # Optional imports
 try:
@@ -1274,6 +1275,55 @@ def delete_completed_file(step_num, filename, storage_dir, substep_code=None):
         st.error(f"Lỗi khi xóa file: {str(e)}")
         return False
 
+def copy_template_files_to_completed(step_num, substep_code=None):
+    """Copy template files to completed files when status changes to completed"""
+    try:
+        if substep_code:
+            # Copy substep template files
+            template_storage = init_substep_templates_storage(step_num, substep_code)
+            completed_storage = init_completed_files_storage(step_num, substep_code)
+        else:
+            # Copy step template files
+            template_storage = init_step_templates_storage(step_num)
+            completed_storage = init_completed_files_storage(step_num)
+        
+        # Load template metadata
+        if substep_code:
+            template_metadata = load_substep_template_metadata(template_storage)
+        else:
+            template_metadata = load_step_template_metadata(template_storage)
+        
+        # Load completed metadata to check for duplicates
+        completed_metadata = load_completed_file_metadata(completed_storage)
+        completed_filenames = {info['filename'] for info in completed_metadata}
+        
+        copied_count = 0
+        for file_info in template_metadata:
+            template_file_path = Path(file_info['file_path'])
+            filename = file_info['filename']
+            
+            # Skip if file already exists in completed files
+            if filename in completed_filenames:
+                continue
+            
+            # Skip if template file doesn't exist
+            if not template_file_path.exists():
+                continue
+            
+            # Copy file to completed storage
+            completed_file_path = completed_storage / filename
+            shutil.copy2(template_file_path, completed_file_path)
+            
+            # Save metadata
+            file_type = file_info.get('file_type', 'unknown')
+            save_completed_file_info(step_num, filename, file_type, completed_storage, substep_code)
+            copied_count += 1
+        
+        return copied_count
+    except Exception as e:
+        st.error(f"Lỗi khi copy file từ template sang completed: {str(e)}")
+        return 0
+
 def render_completed_file_upload(step_num, substep_code=None, substep_content=""):
     """Render completed file upload section for step or substep"""
     if substep_code:
@@ -1286,6 +1336,14 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
         storage_dir = init_completed_files_storage(step_num)
     
     st.markdown(f"**{title}**")
+    
+    # Check if this is the first time showing completed section and auto-copy template files
+    auto_copy_key = f"auto_copy_{key_prefix}"
+    if auto_copy_key not in st.session_state:
+        copied_count = copy_template_files_to_completed(step_num, substep_code)
+        if copied_count > 0:
+            st.info(f"📋 Đã tự động copy {copied_count} file từ file mẫu sang file hoàn thành.")
+        st.session_state[auto_copy_key] = True
     
     # Upload section
     uploaded_files = st.file_uploader(
@@ -1385,12 +1443,50 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
     metadata = load_completed_file_metadata(storage_dir)
     
     if metadata:
-        st.markdown("*Các file đã upload:*")
+        # Remove duplicates based on file_path, file_id, AND upload_date
+        seen_combinations = set()
+        unique_metadata = []
+        for file_info in metadata:
+            file_path = file_info.get('file_path', '')
+            file_id = file_info.get('id', '')
+            upload_date = file_info.get('upload_date', '')
+            filename = file_info.get('filename', '')
+            
+            # Create a unique combination identifier
+            unique_identifier = f"{file_path}_{upload_date}_{filename}"
+            if file_id:
+                unique_identifier = f"{file_id}_{upload_date}"
+            
+            if unique_identifier and unique_identifier not in seen_combinations:
+                seen_combinations.add(unique_identifier)
+                unique_metadata.append(file_info)
+        metadata = unique_metadata
+        
+        st.markdown(f"*Các file đã upload ({len(metadata)} file):*")
         # Reverse to show newest first
         metadata.reverse()
+        
+        # Initialize widget counter for unique keys
+        widget_counter_key = f"completed_widget_cnt_{key_prefix}"
+        if widget_counter_key not in st.session_state:
+            st.session_state[widget_counter_key] = 0
+        st.session_state[widget_counter_key] = 0
+        
         for idx, file_info in enumerate(metadata):
             file_path = Path(file_info['file_path'])
             file_exists = file_path.exists()
+            
+            # Increment counter for unique keys
+            st.session_state[widget_counter_key] += 1
+            widget_num = st.session_state[widget_counter_key]
+            
+            # Generate unique UUID for each widget
+            download_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+            delete_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+            
+            # Create unique keys
+            download_key = f"dl_completed_{key_prefix}_{widget_num}_{download_uuid}"
+            delete_key = f"del_completed_{key_prefix}_{widget_num}_{delete_uuid}"
             
             col_file1, col_file2, col_file3 = st.columns([3, 1, 1])
             with col_file1:
@@ -1399,28 +1495,30 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
             
             with col_file2:
                 if file_exists:
-                    with open(file_path, 'rb') as f:
-                        # Use file_path hash for uniqueness
-                        file_path_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:16]
-                        key_base = f"download_{key_prefix}_{file_path_hash}_{idx}"
-                        unique_key = sanitize_key(key_base)
-                        st.download_button(
-                            label="📥 Tải",
-                            data=f.read(),
-                            file_name=file_info['filename'],
-                            mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=unique_key,
-                            use_container_width=True
-                        )
+                    try:
+                        with open(file_path, 'rb') as f:
+                            file_data = f.read()
+                            st.download_button(
+                                label="📥 Tải",
+                                data=file_data,
+                                file_name=file_info['filename'],
+                                mime=file_info.get('file_type', 'application/octet-stream'),
+                                key=download_key,
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.error(f"Không thể đọc file: {str(e)}")
+                        st.button("📥 Tải", key=f"{download_key}_err", disabled=True, use_container_width=True)
+                else:
+                    st.button("📥 Tải", key=f"{download_key}_na", disabled=True, use_container_width=True, help="File không tồn tại")
             
             with col_file3:
-                file_path_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:16]
-                delete_key_base = f"delete_{key_prefix}_{file_path_hash}_{idx}"
-                delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_completed_file(step_num, file_info['filename'], storage_dir, substep_code):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
                         st.rerun()
+    else:
+        st.info("Chưa có file hoàn thành nào được upload.")
 
 # ==================== CHECKLIST & STATUS FUNCTIONS ====================
 
