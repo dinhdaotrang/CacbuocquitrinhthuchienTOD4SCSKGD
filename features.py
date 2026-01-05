@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 import os
 import hashlib
+import uuid
 
 # Optional imports
 try:
@@ -40,7 +41,6 @@ def sanitize_key(key_string):
     Uses hash to ensure uniqueness and avoid duplicate key errors"""
     # Use full hash to ensure key is always unique and valid
     key_hash = hashlib.md5(key_string.encode()).hexdigest()
-    # Use only hash to ensure absolute uniqueness, no prefix to avoid collisions
     return f"key_{key_hash}"
 
 # ==================== VISUALIZATION FUNCTIONS ====================
@@ -257,7 +257,11 @@ def save_file_info(filename, file_type, storage_dir):
     else:
         metadata = []
     
+    # Generate unique ID for this file
+    file_id = str(uuid.uuid4())[:8]
+    
     file_info = {
+        'id': file_id,  # Add unique ID
         'filename': filename,
         'file_type': file_type,
         'upload_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -525,7 +529,8 @@ def render_file_management():
                         if file_exists:
                             with open(file_path_obj, "rb") as f:
                                 file_data = f.read()
-                                key_base = f"dl_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                                key_base = f"dl_{file_id}"
                                 unique_key = sanitize_key(key_base)
                                 st.download_button(
                                     "⬇️ Tải xuống",
@@ -559,7 +564,8 @@ def render_file_management():
                             # Text already saved, offer download
                             with open(saved_text_path, 'r', encoding='utf-8') as f:
                                 text_data = f.read()
-                            key_base = f"save_text_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                            file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                            key_base = f"save_text_{file_id}"
                             unique_key = sanitize_key(key_base)
                             st.download_button(
                                 "💾 Lưu văn bản",
@@ -675,7 +681,11 @@ def save_step_template_info(step_num, filename, file_type, storage_dir):
     else:
         metadata = []
     
+    # Generate unique ID for this file
+    file_id = str(uuid.uuid4())[:8]
+    
     file_info = {
+        'id': file_id,  # Add unique ID
         'filename': filename,
         'file_type': file_type,
         'upload_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -750,7 +760,11 @@ def save_substep_template_info(step_num, substep_code, filename, file_type, stor
     else:
         metadata = []
     
+    # Generate unique ID for this file
+    file_id = str(uuid.uuid4())[:8]
+    
     file_info = {
+        'id': file_id,  # Add unique ID
         'filename': filename,
         'file_type': file_type,
         'upload_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -893,9 +907,9 @@ def render_substep_templates(step_num, substep_code):
             with col_download:
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
-                        # Create unique key using hash to avoid duplicate key errors
-                        # Include file_path to ensure uniqueness even if filename is duplicate
-                        key_base = f"download_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                        # Create unique key using file ID to ensure absolute uniqueness
+                        file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                        key_base = f"download_substep_template_{step_num}_{substep_code}_{file_id}"
                         unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
@@ -907,7 +921,8 @@ def render_substep_templates(step_num, substep_code):
                         )
             
             with col_delete:
-                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{file_id}"
                 delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
@@ -1004,7 +1019,8 @@ def render_step_templates(step_num):
                 if file_exists:
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
-                    key_base = f"dl_template_{step_num}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                    file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                    key_base = f"dl_template_{step_num}_{file_id}"
                     unique_key = sanitize_key(key_base)
                     st.download_button(
                         "⬇️",
@@ -1018,7 +1034,8 @@ def render_step_templates(step_num):
                 else:
                     st.button("⬇️", key=f"dl_disabled_{step_num}_{idx}", disabled=True, use_container_width=True, help="File không tồn tại")
                 
-                del_key_base = f"del_template_{step_num}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                del_key_base = f"del_template_{step_num}_{file_id}"
                 del_key = sanitize_key(del_key_base)
                 if st.button("🗑️", key=del_key, use_container_width=True, help="Xóa"):
                     if delete_step_template_file(step_num, file_info['filename'], storage_dir):
@@ -1050,7 +1067,11 @@ def save_completed_file_info(step_num, filename, file_type, storage_dir, substep
     else:
         metadata = []
     
+    # Generate unique ID for this file
+    file_id = str(uuid.uuid4())[:8]
+    
     file_info = {
+        'id': file_id,  # Add unique ID
         'filename': filename,
         'file_type': file_type,
         'upload_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -1196,7 +1217,8 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
             with col_file2:
                 if file_exists:
                     with open(file_path, 'rb') as f:
-                        key_base = f"download_{key_prefix}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                        file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                        key_base = f"download_{key_prefix}_{file_id}"
                         unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
@@ -1208,7 +1230,8 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
                         )
             
             with col_file3:
-                delete_key_base = f"delete_{key_prefix}_{idx}_{file_info['filename']}_{file_info.get('file_path', '')}_{file_info.get('upload_date', '')}"
+                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
+                delete_key_base = f"delete_{key_prefix}_{file_id}"
                 delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_completed_file(step_num, file_info['filename'], storage_dir, substep_code):
