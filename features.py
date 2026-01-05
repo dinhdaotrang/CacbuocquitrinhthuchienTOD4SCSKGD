@@ -904,8 +904,9 @@ def render_substep_templates(step_num, substep_code):
                     with col_up2:
                         with open(file_path, "rb") as f:
                             file_data = f.read()
-                            widget_uuid = str(uuid.uuid4())[:12]
-                            unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{widget_uuid}"
+                            # Use filename hash for stable key
+                            filename_hash = hashlib.md5(uploaded_file.name.encode()).hexdigest()[:16]
+                            unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{filename_hash}"
                             st.download_button(
                                 label="⬇️ Tải xuống file vừa upload",
                                 data=file_data,
@@ -926,8 +927,9 @@ def render_substep_templates(step_num, substep_code):
                         with cols[idx % 3]:
                             with open(file_path, "rb") as f:
                                 file_data = f.read()
-                                widget_uuid = str(uuid.uuid4())[:12]
-                                unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{idx}_{widget_uuid}"
+                                # Use filename hash for stable key
+                                filename_hash = hashlib.md5(filename.encode()).hexdigest()[:16]
+                                unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{idx}_{filename_hash}"
                                 st.download_button(
                                     label=f"⬇️ {filename[:20]}...",
                                     data=file_data,
@@ -980,25 +982,37 @@ def render_substep_templates(step_num, substep_code):
         
         st.markdown(f"*Danh sách file mẫu ({len(metadata)} file):*")
         
-        # Reset counter at start of file list rendering
-        st.session_state[widget_counter_key] = 0
+        # Initialize widget key mapping in session state to ensure consistent keys across reruns
+        widget_key_map_key = f"widget_keys_{step_num}_{substep_code}"
+        if widget_key_map_key not in st.session_state:
+            st.session_state[widget_key_map_key] = {}
         
-        # Track used keys to prevent duplicates - reset each render
-        used_keys_key = f"used_keys_{step_num}_{substep_code}"
-        used_keys = set()  # Create new set each render
+        widget_key_map = st.session_state[widget_key_map_key]
         
         for idx, file_info in enumerate(metadata):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Generate completely unique UUID for each widget - no combination, just pure UUID
-            # This ensures absolute uniqueness regardless of any other factors
-            download_uuid_full = str(uuid.uuid4()).replace('-', '')
-            delete_uuid_full = str(uuid.uuid4()).replace('-', '')
+            # Use file_id from metadata (fixed for each file) or generate hash from file_path
+            file_id = file_info.get('id', '')
+            if not file_id:
+                # If no file_id, create a stable hash from file_path
+                file_path_str = str(file_path_obj)
+                file_id = hashlib.md5(file_path_str.encode()).hexdigest()[:16]
             
-            # Use only UUID for key - simplest and most reliable approach
-            download_key = f"dl_{download_uuid_full}"
-            delete_key = f"del_{delete_uuid_full}"
+            # Create stable keys based on file_id - same file always gets same key
+            # Add idx to handle edge cases where same file_id appears multiple times
+            download_key_base = f"dl_substep_{step_num}_{substep_code}_{file_id}_{idx}"
+            delete_key_base = f"del_substep_{step_num}_{substep_code}_{file_id}_{idx}"
+            
+            # Store keys in mapping to ensure consistency
+            if download_key_base not in widget_key_map:
+                widget_key_map[download_key_base] = download_key_base
+            if delete_key_base not in widget_key_map:
+                widget_key_map[delete_key_base] = delete_key_base
+            
+            download_key = widget_key_map[download_key_base]
+            delete_key = widget_key_map[delete_key_base]
             
             # Use container to isolate each file's widgets
             with st.container():
@@ -1013,7 +1027,7 @@ def render_substep_templates(step_num, substep_code):
                         try:
                             with open(file_path_obj, 'rb') as f:
                                 file_data = f.read()
-                                # Use pure UUID for key - guaranteed unique
+                                # Use stable key based on file_id
                                 st.download_button(
                                     label="📥 Tải",
                                     data=file_data,
@@ -1024,11 +1038,11 @@ def render_substep_templates(step_num, substep_code):
                                 )
                         except Exception as e:
                             st.error(f"Không thể đọc file: {str(e)}")
-                            err_uuid = str(uuid.uuid4()).replace('-', '')
-                            st.button("📥 Tải", key=f"err_{err_uuid}", disabled=True, use_container_width=True)
+                            err_key = f"err_{download_key_base}"
+                            st.button("📥 Tải", key=err_key, disabled=True, use_container_width=True)
                     else:
-                        na_uuid = str(uuid.uuid4()).replace('-', '')
-                        st.button("📥 Tải", key=f"na_{na_uuid}", disabled=True, use_container_width=True, help="File không tồn tại")
+                        na_key = f"na_{download_key_base}"
+                        st.button("📥 Tải", key=na_key, disabled=True, use_container_width=True, help="File không tồn tại")
                 
                 with col_delete:
                     if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
@@ -1100,8 +1114,9 @@ def render_step_templates(step_num):
                     with col_up2:
                         with open(file_path, "rb") as f:
                             file_data = f.read()
-                            widget_uuid = str(uuid.uuid4())[:12]
-                            unique_key = f"download_uploaded_step_{step_num}_{widget_uuid}"
+                            # Use filename hash for stable key
+                            filename_hash = hashlib.md5(uploaded_file.name.encode()).hexdigest()[:16]
+                            unique_key = f"download_uploaded_step_{step_num}_{filename_hash}"
                             st.download_button(
                                 label="⬇️ Tải xuống file vừa upload",
                                 data=file_data,
@@ -1122,8 +1137,9 @@ def render_step_templates(step_num):
                         with cols[idx % 3]:
                             with open(file_path, "rb") as f:
                                 file_data = f.read()
-                                widget_uuid = str(uuid.uuid4())[:12]
-                                unique_key = f"download_uploaded_step_{step_num}_{idx}_{widget_uuid}"
+                                # Use filename hash for stable key
+                                filename_hash = hashlib.md5(filename.encode()).hexdigest()[:16]
+                                unique_key = f"download_uploaded_step_{step_num}_{idx}_{filename_hash}"
                                 st.download_button(
                                     label=f"⬇️ {filename[:20]}...",
                                     data=file_data,
@@ -1146,9 +1162,36 @@ def render_step_templates(step_num):
         
         st.markdown(f"**Danh sách file mẫu đã upload ({len(metadata)} file):**")
         
+        # Initialize widget key mapping in session state to ensure consistent keys across reruns
+        widget_key_map_key = f"widget_keys_step_{step_num}"
+        if widget_key_map_key not in st.session_state:
+            st.session_state[widget_key_map_key] = {}
+        
+        widget_key_map = st.session_state[widget_key_map_key]
+        
         for idx, file_info in enumerate(metadata):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
+            
+            # Use file_id from metadata (fixed for each file) or generate hash from file_path
+            file_id = file_info.get('id', '')
+            if not file_id:
+                # If no file_id, create a stable hash from file_path
+                file_path_str = str(file_path_obj)
+                file_id = hashlib.md5(file_path_str.encode()).hexdigest()[:16]
+            
+            # Create stable keys based on file_id - same file always gets same key
+            download_key_base = f"dl_template_{step_num}_{file_id}_{idx}"
+            delete_key_base = f"del_template_{step_num}_{file_id}_{idx}"
+            
+            # Store keys in mapping to ensure consistency
+            if download_key_base not in widget_key_map:
+                widget_key_map[download_key_base] = download_key_base
+            if delete_key_base not in widget_key_map:
+                widget_key_map[delete_key_base] = delete_key_base
+            
+            download_key = widget_key_map[download_key_base]
+            delete_key = widget_key_map[delete_key_base]
             
             col_info, col_actions = st.columns([4, 1])
             
@@ -1165,26 +1208,20 @@ def render_step_templates(step_num):
                 if file_exists:
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
-                    # Use file_path hash for uniqueness
-                    file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
-                    key_base = f"dl_template_{step_num}_{file_path_hash}_{idx}"
-                    unique_key = sanitize_key(key_base)
                     st.download_button(
                         "⬇️",
                         data=file_data,
                         file_name=file_info['filename'],
                         mime=file_info['file_type'],
-                        key=unique_key,
+                        key=download_key,
                         use_container_width=True,
                         help="Tải xuống"
                     )
                 else:
-                    st.button("⬇️", key=f"dl_disabled_{step_num}_{idx}", disabled=True, use_container_width=True, help="File không tồn tại")
+                    disabled_key = f"dl_disabled_{step_num}_{file_id}_{idx}"
+                    st.button("⬇️", key=disabled_key, disabled=True, use_container_width=True, help="File không tồn tại")
                 
-                file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
-                del_key_base = f"del_template_{step_num}_{file_path_hash}_{idx}"
-                del_key = sanitize_key(del_key_base)
-                if st.button("🗑️", key=del_key, use_container_width=True, help="Xóa"):
+                if st.button("🗑️", key=delete_key, use_container_width=True, help="Xóa"):
                     if delete_step_template_file(step_num, file_info['filename'], storage_dir):
                         st.success(f"✅ Đã xóa file: {file_info['filename']}")
                         st.rerun()
@@ -1407,8 +1444,9 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
                     with col_up2:
                         with open(file_path, "rb") as f:
                             file_data = f.read()
-                            widget_uuid = str(uuid.uuid4())[:12]
-                            unique_key = f"download_uploaded_completed_{key_prefix}_{widget_uuid}"
+                            # Use filename hash for stable key
+                            filename_hash = hashlib.md5(uploaded_file.name.encode()).hexdigest()[:16]
+                            unique_key = f"download_uploaded_completed_{key_prefix}_{filename_hash}"
                             st.download_button(
                                 label="⬇️ Tải xuống file vừa upload",
                                 data=file_data,
@@ -1429,8 +1467,9 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
                         with cols[idx % 3]:
                             with open(file_path, "rb") as f:
                                 file_data = f.read()
-                                widget_uuid = str(uuid.uuid4())[:12]
-                                unique_key = f"download_uploaded_completed_{key_prefix}_{idx}_{widget_uuid}"
+                                # Use filename hash for stable key
+                                filename_hash = hashlib.md5(filename.encode()).hexdigest()[:16]
+                                unique_key = f"download_uploaded_completed_{key_prefix}_{idx}_{filename_hash}"
                                 st.download_button(
                                     label=f"⬇️ {filename[:20]}...",
                                     data=file_data,
@@ -1471,27 +1510,36 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
         # Reverse to show newest first
         metadata.reverse()
         
-        # Initialize widget counter for unique keys
-        widget_counter_key = f"completed_widget_cnt_{key_prefix}"
-        if widget_counter_key not in st.session_state:
-            st.session_state[widget_counter_key] = 0
-        st.session_state[widget_counter_key] = 0
+        # Initialize widget key mapping in session state to ensure consistent keys across reruns
+        widget_key_map_key = f"widget_keys_completed_{key_prefix}"
+        if widget_key_map_key not in st.session_state:
+            st.session_state[widget_key_map_key] = {}
+        
+        widget_key_map = st.session_state[widget_key_map_key]
         
         for idx, file_info in enumerate(metadata):
             file_path = Path(file_info['file_path'])
             file_exists = file_path.exists()
             
-            # Increment counter for unique keys
-            st.session_state[widget_counter_key] += 1
-            widget_num = st.session_state[widget_counter_key]
+            # Use file_id from metadata (fixed for each file) or generate hash from file_path
+            file_id = file_info.get('id', '')
+            if not file_id:
+                # If no file_id, create a stable hash from file_path
+                file_path_str = str(file_path)
+                file_id = hashlib.md5(file_path_str.encode()).hexdigest()[:16]
             
-            # Generate unique UUID for each widget
-            download_uuid = str(uuid.uuid4()).replace('-', '')[:12]
-            delete_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+            # Create stable keys based on file_id - same file always gets same key
+            download_key_base = f"dl_completed_{key_prefix}_{file_id}_{idx}"
+            delete_key_base = f"del_completed_{key_prefix}_{file_id}_{idx}"
             
-            # Create unique keys
-            download_key = f"dl_completed_{key_prefix}_{widget_num}_{download_uuid}"
-            delete_key = f"del_completed_{key_prefix}_{widget_num}_{delete_uuid}"
+            # Store keys in mapping to ensure consistency
+            if download_key_base not in widget_key_map:
+                widget_key_map[download_key_base] = download_key_base
+            if delete_key_base not in widget_key_map:
+                widget_key_map[delete_key_base] = delete_key_base
+            
+            download_key = widget_key_map[download_key_base]
+            delete_key = widget_key_map[delete_key_base]
             
             col_file1, col_file2, col_file3 = st.columns([3, 1, 1])
             with col_file1:
