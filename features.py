@@ -769,8 +769,21 @@ def save_substep_template_info(step_num, substep_code, filename, file_type, stor
     else:
         metadata = []
     
+    # #region agent log
+    import json as json_log
+    original_count = len(metadata)
+    with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+        log_f.write(json_log.dumps({"location":"features.py:756","message":"Before removing duplicates in save","data":{"step_num":step_num,"substep_code":substep_code,"filename":filename,"original_metadata_count":original_count,"existing_filenames":[m.get('filename','') for m in metadata]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"E"}) + '\n')
+    # #endregion
+    
     # Remove existing entries with the same filename to avoid duplicates
     metadata = [m for m in metadata if m.get('filename') != filename]
+    
+    # #region agent log
+    after_removal_count = len(metadata)
+    with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+        log_f.write(json_log.dumps({"location":"features.py:765","message":"After removing duplicates in save","data":{"filename":filename,"after_removal_count":after_removal_count,"removed_count":original_count-after_removal_count},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"E"}) + '\n')
+    # #endregion
     
     # Generate unique ID for this file
     file_id = str(uuid.uuid4())[:8]
@@ -784,6 +797,11 @@ def save_substep_template_info(step_num, substep_code, filename, file_type, stor
     }
     
     metadata.append(file_info)
+    
+    # #region agent log
+    with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+        log_f.write(json_log.dumps({"location":"features.py:781","message":"After appending new file info","data":{"filename":filename,"new_file_id":file_id,"final_metadata_count":len(metadata),"all_filenames":[m.get('filename','') for m in metadata]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"E"}) + '\n')
+    # #endregion
     
     with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)
@@ -946,6 +964,12 @@ def render_substep_templates(step_num, substep_code):
     # File list
     metadata = load_substep_template_metadata(storage_dir)
     
+    # #region agent log
+    import json as json_log
+    with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        f.write(json_log.dumps({"location":"features.py:947","message":"Loaded metadata","data":{"step_num":step_num,"substep_code":substep_code,"metadata_count":len(metadata),"filenames":[m.get('filename','') for m in metadata],"file_ids":[m.get('id','') for m in metadata]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"A,E"}) + '\n')
+    # #endregion
+    
     if metadata:
         # Clean up metadata: remove duplicates and keep only files that actually exist
         cleaned_metadata = []
@@ -972,9 +996,17 @@ def render_substep_templates(step_num, substep_code):
             metadata_file = storage_dir / "metadata.json"
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(cleaned_metadata, f, ensure_ascii=False, indent=2)
+            # #region agent log
+            with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+                log_f.write(json_log.dumps({"location":"features.py:971","message":"Cleaned metadata - removed duplicates","data":{"original_count":len(metadata),"cleaned_count":len(cleaned_metadata),"removed_count":len(metadata)-len(cleaned_metadata),"cleaned_filenames":[m.get('filename','') for m in cleaned_metadata]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"C"}) + '\n')
+            # #endregion
             st.info(f"🧹 Đã làm sạch metadata: từ {len(metadata)} entries xuống còn {len(cleaned_metadata)} file.")
             metadata = cleaned_metadata
         else:
+            # #region agent log
+            with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+                log_f.write(json_log.dumps({"location":"features.py:978","message":"No duplicates found in metadata","data":{"metadata_count":len(cleaned_metadata)},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"C"}) + '\n')
+            # #endregion
             metadata = cleaned_metadata
         
         # Reverse to show newest first
@@ -1005,6 +1037,11 @@ def render_substep_templates(step_num, substep_code):
             download_key_base = f"dl_substep_{step_num}_{substep_code}_{file_id}_{idx}"
             delete_key_base = f"del_substep_{step_num}_{substep_code}_{file_id}_{idx}"
             
+            # #region agent log
+            with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+                log_f.write(json_log.dumps({"location":"features.py:1005","message":"Generating widget keys","data":{"idx":idx,"filename":file_info.get('filename',''),"file_id":file_id,"file_id_empty":not bool(file_id),"download_key_base":download_key_base,"delete_key_base":delete_key_base,"file_path":str(file_path_obj),"upload_date":file_info.get('upload_date','')},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"B,D"}) + '\n')
+            # #endregion
+            
             # Store keys in mapping to ensure consistency
             if download_key_base not in widget_key_map:
                 widget_key_map[download_key_base] = download_key_base
@@ -1013,6 +1050,11 @@ def render_substep_templates(step_num, substep_code):
             
             download_key = widget_key_map[download_key_base]
             delete_key = widget_key_map[delete_key_base]
+            
+            # #region agent log
+            with open(r'd:\AI\Cursor\Các bước qui trình SCS-TOD4\CacbuocquitrinhthuchienTOD4SCSKGD\.cursor\debug.log', 'a', encoding='utf-8') as log_f:
+                log_f.write(json_log.dumps({"location":"features.py:1015","message":"Final widget keys","data":{"idx":idx,"filename":file_info.get('filename',''),"download_key":download_key,"delete_key":delete_key,"key_already_in_map":download_key_base in widget_key_map},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"D"}) + '\n')
+            # #endregion
             
             # Use container to isolate each file's widgets
             with st.container():

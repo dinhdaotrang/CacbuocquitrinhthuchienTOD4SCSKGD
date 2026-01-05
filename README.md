@@ -32,9 +32,15 @@ pip install -r requirements.txt
    - Lấy API key từ: https://platform.openai.com/api-keys
 
 4. Chạy ứng dụng:
+
+**Cách nhanh nhất**: Double-click vào file `run_app.bat` trong thư mục dự án
+
+Hoặc chạy bằng lệnh:
 ```bash
 streamlit run app.py
 ```
+
+**Xem thêm**: File `HUONG_DAN_CHAY_UNG_DUNG.md` để biết các cách chạy khác và troubleshooting
 
 ## 📁 Cấu trúc dự án
 
@@ -43,7 +49,9 @@ streamlit run app.py
 ├── app.py          # File chính của ứng dụng Streamlit
 ├── features.py     # Module chứa các tính năng nâng cao (biểu đồ, file, checklist, AI)
 ├── requirements.txt # Danh sách thư viện cần thiết
-├── README.md       # File hướng dẫn
+├── run_app.bat     # File batch để chạy ứng dụng nhanh (Windows)
+├── README.md       # File hướng dẫn tổng quan
+├── HUONG_DAN_CHAY_UNG_DUNG.md  # Hướng dẫn chi tiết cách chạy ứng dụng
 ├── .env.example    # Template file cấu hình API key
 ├── .gitignore      # Git ignore file
 ├── TOD4_TIẾN ĐỘ VÀ CÁC BƯỚC THỰC HIỆN CV REV2.csv  # Dữ liệu quy trình
