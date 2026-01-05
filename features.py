@@ -529,8 +529,9 @@ def render_file_management():
                         if file_exists:
                             with open(file_path_obj, "rb") as f:
                                 file_data = f.read()
-                                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                                key_base = f"dl_{file_id}"
+                                # Use file_path hash for uniqueness
+                                file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
+                                key_base = f"dl_{file_path_hash}_{idx}"
                                 unique_key = sanitize_key(key_base)
                                 st.download_button(
                                     "⬇️ Tải xuống",
@@ -564,8 +565,9 @@ def render_file_management():
                             # Text already saved, offer download
                             with open(saved_text_path, 'r', encoding='utf-8') as f:
                                 text_data = f.read()
-                            file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                            key_base = f"save_text_{file_id}"
+                            # Use file_path hash for uniqueness
+                            file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
+                            key_base = f"save_text_{file_path_hash}_{idx}"
                             unique_key = sanitize_key(key_base)
                             st.download_button(
                                 "💾 Lưu văn bản",
@@ -898,6 +900,10 @@ def render_substep_templates(step_num, substep_code):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
+            # Use file_path hash as the unique identifier (file_path is always unique)
+            file_path_str = str(file_path_obj)
+            file_path_hash = hashlib.md5(file_path_str.encode()).hexdigest()[:16]
+            
             col_info, col_download, col_delete = st.columns([3, 1, 1])
             
             with col_info:
@@ -907,9 +913,8 @@ def render_substep_templates(step_num, substep_code):
             with col_download:
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
-                        # Create unique key using file ID to ensure absolute uniqueness
-                        file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                        key_base = f"download_substep_template_{step_num}_{substep_code}_{file_id}"
+                        # Create unique key using file_path hash - this is always unique
+                        key_base = f"download_substep_template_{step_num}_{substep_code}_{file_path_hash}_{idx}"
                         unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
@@ -921,8 +926,7 @@ def render_substep_templates(step_num, substep_code):
                         )
             
             with col_delete:
-                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{file_id}"
+                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{file_path_hash}_{idx}"
                 delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
@@ -1019,8 +1023,9 @@ def render_step_templates(step_num):
                 if file_exists:
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
-                    file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                    key_base = f"dl_template_{step_num}_{file_id}"
+                    # Use file_path hash for uniqueness
+                    file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
+                    key_base = f"dl_template_{step_num}_{file_path_hash}_{idx}"
                     unique_key = sanitize_key(key_base)
                     st.download_button(
                         "⬇️",
@@ -1034,8 +1039,8 @@ def render_step_templates(step_num):
                 else:
                     st.button("⬇️", key=f"dl_disabled_{step_num}_{idx}", disabled=True, use_container_width=True, help="File không tồn tại")
                 
-                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                del_key_base = f"del_template_{step_num}_{file_id}"
+                file_path_hash = hashlib.md5(str(file_path_obj).encode()).hexdigest()[:16]
+                del_key_base = f"del_template_{step_num}_{file_path_hash}_{idx}"
                 del_key = sanitize_key(del_key_base)
                 if st.button("🗑️", key=del_key, use_container_width=True, help="Xóa"):
                     if delete_step_template_file(step_num, file_info['filename'], storage_dir):
@@ -1217,8 +1222,9 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
             with col_file2:
                 if file_exists:
                     with open(file_path, 'rb') as f:
-                        file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                        key_base = f"download_{key_prefix}_{file_id}"
+                        # Use file_path hash for uniqueness
+                        file_path_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:16]
+                        key_base = f"download_{key_prefix}_{file_path_hash}_{idx}"
                         unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
@@ -1230,8 +1236,8 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
                         )
             
             with col_file3:
-                file_id = file_info.get('id', f"{idx}_{file_info['filename']}")
-                delete_key_base = f"delete_{key_prefix}_{file_id}"
+                file_path_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:16]
+                delete_key_base = f"delete_{key_prefix}_{file_path_hash}_{idx}"
                 delete_key = sanitize_key(delete_key_base)
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_completed_file(step_num, file_info['filename'], storage_dir, substep_code):
