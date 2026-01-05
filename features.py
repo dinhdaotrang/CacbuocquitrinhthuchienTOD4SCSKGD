@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from pathlib import Path
 import json
 import os
+import hashlib
 
 # Optional imports
 try:
@@ -31,6 +32,17 @@ try:
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
+
+# ==================== HELPER FUNCTIONS ====================
+
+def sanitize_key(key_string):
+    """Sanitize a string to be used as a Streamlit widget key
+    Uses hash to ensure uniqueness and avoid duplicate key errors"""
+    # Use hash to ensure key is always unique and valid
+    key_hash = hashlib.md5(key_string.encode()).hexdigest()[:16]
+    # Include part of original string for debugging, but hash ensures uniqueness
+    safe_prefix = key_string.replace('/', '_').replace('\\', '_').replace(':', '_')[:30]
+    return f"{safe_prefix}_{key_hash}"
 
 # ==================== VISUALIZATION FUNCTIONS ====================
 
@@ -796,17 +808,22 @@ def render_substep_templates(step_num, substep_code):
             with col_download:
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
+                        # Create unique key using hash to avoid duplicate key errors
+                        key_base = f"download_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}"
+                        unique_key = sanitize_key(key_base)
                         st.download_button(
                             label="📥 Tải",
                             data=f.read(),
                             file_name=file_info['filename'],
                             mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=f"download_substep_template_{step_num}_{substep_code}_{file_info['filename']}",
+                            key=unique_key,
                             use_container_width=True
                         )
             
             with col_delete:
-                if st.button("🗑️ Xóa", key=f"delete_substep_template_{step_num}_{substep_code}_{file_info['filename']}", use_container_width=True):
+                delete_key_base = f"delete_substep_template_{step_num}_{substep_code}_{idx}_{file_info['filename']}"
+                delete_key = sanitize_key(delete_key_base)
+                if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
                         st.rerun()
@@ -1015,7 +1032,7 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
         st.markdown("*Các file đã upload:*")
         # Reverse to show newest first
         metadata.reverse()
-        for file_info in metadata:
+        for idx, file_info in enumerate(metadata):
             file_path = Path(file_info['file_path'])
             file_exists = file_path.exists()
             
@@ -1032,12 +1049,12 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
                             data=f.read(),
                             file_name=file_info['filename'],
                             mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=f"download_{key_prefix}_{file_info['filename']}",
+                            key=f"download_{key_prefix}_{idx}_{file_info['filename']}",
                             use_container_width=True
                         )
             
             with col_file3:
-                if st.button("🗑️ Xóa", key=f"delete_{key_prefix}_{file_info['filename']}", use_container_width=True):
+                if st.button("🗑️ Xóa", key=f"delete_{key_prefix}_{idx}_{file_info['filename']}", use_container_width=True):
                     if delete_completed_file(step_num, file_info['filename'], storage_dir, substep_code):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
                         st.rerun()
