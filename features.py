@@ -930,13 +930,19 @@ def render_substep_templates(step_num, substep_code):
     metadata = load_substep_template_metadata(storage_dir)
     
     if metadata:
-        # Remove duplicates based on file_path to avoid duplicate keys
+        # Remove duplicates based on file_path AND file_id to avoid duplicate keys
         seen_paths = set()
+        seen_ids = set()
         unique_metadata = []
         for file_info in metadata:
             file_path = file_info.get('file_path', '')
-            if file_path and file_path not in seen_paths:
-                seen_paths.add(file_path)
+            file_id = file_info.get('id', '')
+            # Use both file_path and file_id to identify duplicates
+            unique_id = f"{file_path}_{file_id}" if file_id else file_path
+            if unique_id and unique_id not in seen_paths:
+                seen_paths.add(unique_id)
+                if file_id:
+                    seen_ids.add(file_id)
                 unique_metadata.append(file_info)
         metadata = unique_metadata
         
@@ -949,9 +955,19 @@ def render_substep_templates(step_num, substep_code):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Generate unique UUID for each widget instance to ensure absolute uniqueness
-            download_uuid = str(uuid.uuid4())[:16]
-            delete_uuid = str(uuid.uuid4())[:16]
+            # Create a truly unique key using file_path hash + index + UUID + timestamp
+            file_path_str = str(file_path_obj)
+            file_path_hash = hashlib.md5(file_path_str.encode()).hexdigest()[:16]
+            file_id = file_info.get('id', str(uuid.uuid4())[:8])
+            timestamp_ms = int(datetime.now().timestamp() * 1000000)  # Microseconds
+            
+            # Use file_id if available, otherwise use hash + index + timestamp
+            if file_id:
+                download_key = f"dl_substep_{step_num}_{substep_code}_{file_id}_{idx}_{timestamp_ms}"
+                delete_key = f"del_substep_{step_num}_{substep_code}_{file_id}_{idx}_{timestamp_ms}"
+            else:
+                download_key = f"dl_substep_{step_num}_{substep_code}_{file_path_hash}_{idx}_{timestamp_ms}"
+                delete_key = f"del_substep_{step_num}_{substep_code}_{file_path_hash}_{idx}_{timestamp_ms}"
             
             col_info, col_download, col_delete = st.columns([3, 1, 1])
             
@@ -962,19 +978,17 @@ def render_substep_templates(step_num, substep_code):
             with col_download:
                 if file_exists:
                     with open(file_path_obj, 'rb') as f:
-                        # Use UUID for each widget to ensure absolute uniqueness
-                        unique_key = f"dl_substep_{step_num}_{substep_code}_{download_uuid}"
+                        # Use combined key with timestamp for absolute uniqueness
                         st.download_button(
                             label="📥 Tải",
                             data=f.read(),
                             file_name=file_info['filename'],
                             mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=unique_key,
+                            key=download_key,
                             use_container_width=True
                         )
             
             with col_delete:
-                delete_key = f"del_substep_{step_num}_{substep_code}_{delete_uuid}"
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
                     if delete_substep_template_file(step_num, substep_code, file_info['filename'], storage_dir):
                         st.success(f"✅ Đã xóa: {file_info['filename']}")
