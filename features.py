@@ -831,6 +831,11 @@ def render_substep_templates(step_num, substep_code):
     
     storage_dir = init_substep_templates_storage(step_num, substep_code)
     
+    # Initialize global widget counter for this substep to ensure unique keys
+    widget_counter_key = f"widget_cnt_{step_num}_{substep_code}"
+    if widget_counter_key not in st.session_state:
+        st.session_state[widget_counter_key] = 0
+    
     # Upload section
     uploaded_files = st.file_uploader(
         f"Upload file mẫu cho {substep_code}",
@@ -955,22 +960,24 @@ def render_substep_templates(step_num, substep_code):
         
         st.markdown(f"*Danh sách file mẫu ({len(metadata)} file):*")
         
+        # Reset counter at start of file list rendering
+        st.session_state[widget_counter_key] = 0
+        
         for idx, file_info in enumerate(metadata):
             file_path_obj = Path(file_info['file_path'])
             file_exists = file_path_obj.exists()
             
-            # Generate unique UUID for each widget instance - this ensures absolute uniqueness
-            download_uuid = str(uuid.uuid4())
-            delete_uuid = str(uuid.uuid4())
+            # Increment counter for each file to ensure unique sequential numbers
+            st.session_state[widget_counter_key] += 1
+            widget_num = st.session_state[widget_counter_key]
             
-            # Use UUID + index + file_path hash to ensure uniqueness even with duplicate files
-            file_path_str = str(file_path_obj)
-            file_path_hash = hashlib.md5(file_path_str.encode()).hexdigest()[:12]
-            upload_date = file_info.get('upload_date', '')
+            # Use counter + UUID for absolute uniqueness
+            download_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+            delete_uuid = str(uuid.uuid4()).replace('-', '')[:12]
             
-            # Create unique key combining all identifiers
-            download_key = f"dl_substep_{step_num}_{substep_code}_{idx}_{file_path_hash}_{upload_date}_{download_uuid}"
-            delete_key = f"del_substep_{step_num}_{substep_code}_{idx}_{file_path_hash}_{upload_date}_{delete_uuid}"
+            # Simple, short key using counter and UUID
+            download_key = f"dl_{step_num}_{substep_code}_{widget_num}_{download_uuid}"
+            delete_key = f"del_{step_num}_{substep_code}_{widget_num}_{delete_uuid}"
             
             col_info, col_download, col_delete = st.columns([3, 1, 1])
             
@@ -983,7 +990,7 @@ def render_substep_templates(step_num, substep_code):
                     try:
                         with open(file_path_obj, 'rb') as f:
                             file_data = f.read()
-                            # Use combined key with timestamp for absolute uniqueness
+                            # Use counter + UUID for unique key
                             st.download_button(
                                 label="📥 Tải",
                                 data=file_data,
@@ -994,9 +1001,9 @@ def render_substep_templates(step_num, substep_code):
                             )
                     except Exception as e:
                         st.error(f"Không thể đọc file: {str(e)}")
-                        st.button("📥 Tải", key=f"{download_key}_disabled", disabled=True, use_container_width=True)
+                        st.button("📥 Tải", key=f"{download_key}_err", disabled=True, use_container_width=True)
                 else:
-                    st.button("📥 Tải", key=f"{download_key}_disabled", disabled=True, use_container_width=True, help="File không tồn tại")
+                    st.button("📥 Tải", key=f"{download_key}_na", disabled=True, use_container_width=True, help="File không tồn tại")
             
             with col_delete:
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
