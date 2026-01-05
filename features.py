@@ -379,85 +379,106 @@ def render_file_management():
         "Chọn file để upload",
         type=['pdf', 'docx', 'doc', 'txt', 'xlsx', 'xls'],
         help="Hỗ trợ các định dạng: PDF, Word, Text, Excel. Có thể upload nhiều file cùng lúc.",
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key="file_management_upload"
     )
     
-    if uploaded_files is not None and len(uploaded_files) > 0:
-        # Handle multiple files
-        saved_files = []
-        for uploaded_file in uploaded_files:
-            # Check if file already exists
-            file_path = storage_dir / uploaded_file.name
-            if file_path.exists():
-                st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
-            
-            # Save file
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Get file type
-            file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
-            
-            # Save metadata
-            file_info = save_file_info(uploaded_file.name, file_type, storage_dir)
-            saved_files.append(uploaded_file.name)
-            
-            # Extract and auto-save text content for each file
-            text_content = extract_text_from_file(file_path, file_type)
-            if text_content:
-                saved_text_path = save_text_content(uploaded_file.name, text_content, storage_dir)
+    # Initialize session state for tracking uploaded files
+    upload_key = "file_management_uploaded"
+    if upload_key not in st.session_state:
+        st.session_state[upload_key] = []
+    
+    # Check if new files were uploaded
+    if uploaded_files and len(uploaded_files) > 0:
+        # Get list of new file names (not yet processed)
+        processed_files = st.session_state[upload_key]
+        new_files = [f for f in uploaded_files if f.name not in processed_files]
         
-        if len(saved_files) == 1:
-            st.success(f"✅ Đã upload thành công: {saved_files[0]}")
-            # Show preview for single file
-            uploaded_file = uploaded_files[0]
-            file_path = storage_dir / uploaded_file.name
-            file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
-            
-            # Download button for just uploaded file
-            col_up1, col_up2 = st.columns([3, 1])
-            with col_up2:
-                with open(file_path, "rb") as f:
-                    file_data = f.read()
-                    st.download_button(
-                        label="⬇️ Tải xuống file vừa upload",
-                        data=file_data,
-                        file_name=uploaded_file.name,
-                        mime=file_type,
-                        key=f"download_uploaded_{uploaded_file.name}",
-                        use_container_width=True
-                    )
-            
-            # Extract and preview text
-            text_content = extract_text_from_file(file_path, file_type)
-            if text_content:
-                # Auto-save text content
-                saved_text_path = save_text_content(uploaded_file.name, text_content, storage_dir)
-                if saved_text_path:
-                    st.info(f"💾 Đã tự động lưu nội dung văn bản vào: {saved_text_path.name}")
-                
-                with st.expander("📄 Xem trước nội dung file"):
-                    st.text_area("Nội dung", text_content[:5000], height=300, disabled=True, key=f"preview_{uploaded_file.name}")
-                    if len(text_content) > 5000:
-                        st.info(f"File có {len(text_content)} ký tự. Chỉ hiển thị 5000 ký tự đầu.")
+        if new_files:
+            # Handle multiple files
+            saved_files = []
+            for uploaded_file in new_files:
+                try:
+                    # Check if file already exists
+                    file_path = storage_dir / uploaded_file.name
+                    if file_path.exists():
+                        st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
                     
-                    # Download text content button
-                    if saved_text_path:
-                        with open(saved_text_path, 'r', encoding='utf-8') as f:
-                            text_data = f.read()
-                        st.download_button(
-                            label="💾 Tải xuống nội dung văn bản (.txt)",
-                            data=text_data,
-                            file_name=saved_text_path.name,
-                            mime="text/plain",
-                            key=f"download_text_{uploaded_file.name}",
-                            use_container_width=True
-                        )
-        else:
-            st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
-            st.info(f"💾 Đã tự động lưu nội dung văn bản cho các file có thể trích xuất.")
-        
-        st.rerun()
+                    # Save file
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Get file type
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    # Save metadata
+                    file_info = save_file_info(uploaded_file.name, file_type, storage_dir)
+                    saved_files.append(uploaded_file.name)
+                    
+                    # Extract and auto-save text content for each file
+                    text_content = extract_text_from_file(file_path, file_type)
+                    if text_content:
+                        saved_text_path = save_text_content(uploaded_file.name, text_content, storage_dir)
+                    
+                    # Mark as processed
+                    st.session_state[upload_key].append(uploaded_file.name)
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi upload file {uploaded_file.name}: {str(e)}")
+            
+            if saved_files:
+                if len(saved_files) == 1:
+                    st.success(f"✅ Đã upload thành công: {saved_files[0]}")
+                    # Show preview for single file
+                    uploaded_file = new_files[0]
+                    file_path = storage_dir / uploaded_file.name
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    # Download button for just uploaded file
+                    col_up1, col_up2 = st.columns([3, 1])
+                    with col_up2:
+                        with open(file_path, "rb") as f:
+                            file_data = f.read()
+                            st.download_button(
+                                label="⬇️ Tải xuống file vừa upload",
+                                data=file_data,
+                                file_name=uploaded_file.name,
+                                mime=file_type,
+                                key=f"download_uploaded_{uploaded_file.name}",
+                                use_container_width=True
+                            )
+                    
+                    # Extract and preview text
+                    text_content = extract_text_from_file(file_path, file_type)
+                    if text_content:
+                        # Auto-save text content
+                        saved_text_path = save_text_content(uploaded_file.name, text_content, storage_dir)
+                        if saved_text_path:
+                            st.info(f"💾 Đã tự động lưu nội dung văn bản vào: {saved_text_path.name}")
+                        
+                        with st.expander("📄 Xem trước nội dung file"):
+                            st.text_area("Nội dung", text_content[:5000], height=300, disabled=True, key=f"preview_{uploaded_file.name}")
+                            if len(text_content) > 5000:
+                                st.info(f"File có {len(text_content)} ký tự. Chỉ hiển thị 5000 ký tự đầu.")
+                            
+                            # Download text content button
+                            if saved_text_path:
+                                with open(saved_text_path, 'r', encoding='utf-8') as f:
+                                    text_data = f.read()
+                                st.download_button(
+                                    label="💾 Tải xuống nội dung văn bản (.txt)",
+                                    data=text_data,
+                                    file_name=saved_text_path.name,
+                                    mime="text/plain",
+                                    key=f"download_text_{uploaded_file.name}",
+                                    use_container_width=True
+                                )
+                else:
+                    st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
+                    st.info(f"💾 Đã tự động lưu nội dung văn bản cho các file có thể trích xuất.")
+                st.rerun()
+    elif uploaded_files is not None and len(uploaded_files) == 0:
+        # Reset processed files list when uploader is cleared
+        st.session_state[upload_key] = []
     
     st.markdown("---")
     
@@ -794,31 +815,52 @@ def render_substep_templates(step_num, substep_code):
         key=f"substep_template_upload_{step_num}_{substep_code}"
     )
     
-    if uploaded_files is not None and len(uploaded_files) > 0:
-        # Handle multiple files
-        saved_files = []
-        for uploaded_file in uploaded_files:
-            # Check if file already exists
-            file_path = storage_dir / uploaded_file.name
-            if file_path.exists():
-                st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
-            
-            # Save file
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Get file type
-            file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
-            
-            # Save metadata
-            file_info = save_substep_template_info(step_num, substep_code, uploaded_file.name, file_type, storage_dir)
-            saved_files.append(uploaded_file.name)
+    # Initialize session state for tracking uploaded files
+    upload_key = f"substep_uploaded_{step_num}_{substep_code}"
+    if upload_key not in st.session_state:
+        st.session_state[upload_key] = []
+    
+    # Check if new files were uploaded
+    if uploaded_files and len(uploaded_files) > 0:
+        # Get list of new file names (not yet processed)
+        current_file_names = [f.name for f in uploaded_files]
+        processed_files = st.session_state[upload_key]
+        new_files = [f for f in uploaded_files if f.name not in processed_files]
         
-        if len(saved_files) == 1:
-            st.success(f"✅ Đã upload thành công: {saved_files[0]}")
-        else:
-            st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
-        st.rerun()
+        if new_files:
+            # Handle multiple files
+            saved_files = []
+            for uploaded_file in new_files:
+                try:
+                    # Check if file already exists
+                    file_path = storage_dir / uploaded_file.name
+                    if file_path.exists():
+                        st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
+                    
+                    # Save file
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Get file type
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    # Save metadata
+                    file_info = save_substep_template_info(step_num, substep_code, uploaded_file.name, file_type, storage_dir)
+                    saved_files.append(uploaded_file.name)
+                    # Mark as processed
+                    st.session_state[upload_key].append(uploaded_file.name)
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi upload file {uploaded_file.name}: {str(e)}")
+            
+            if saved_files:
+                if len(saved_files) == 1:
+                    st.success(f"✅ Đã upload thành công: {saved_files[0]}")
+                else:
+                    st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
+                st.rerun()
+    elif uploaded_files is not None and len(uploaded_files) == 0:
+        # Reset processed files list when uploader is cleared
+        st.session_state[upload_key] = []
     
     # File list
     metadata = load_substep_template_metadata(storage_dir)
@@ -878,31 +920,51 @@ def render_step_templates(step_num):
         key=f"step_template_upload_{step_num}"
     )
     
-    if uploaded_files is not None and len(uploaded_files) > 0:
-        # Handle multiple files
-        saved_files = []
-        for uploaded_file in uploaded_files:
-            # Check if file already exists
-            file_path = storage_dir / uploaded_file.name
-            if file_path.exists():
-                st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
-            
-            # Save file
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Get file type
-            file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
-            
-            # Save metadata
-            file_info = save_step_template_info(step_num, uploaded_file.name, file_type, storage_dir)
-            saved_files.append(uploaded_file.name)
+    # Initialize session state for tracking uploaded files
+    upload_key = f"step_uploaded_{step_num}"
+    if upload_key not in st.session_state:
+        st.session_state[upload_key] = []
+    
+    # Check if new files were uploaded
+    if uploaded_files and len(uploaded_files) > 0:
+        # Get list of new file names (not yet processed)
+        processed_files = st.session_state[upload_key]
+        new_files = [f for f in uploaded_files if f.name not in processed_files]
         
-        if len(saved_files) == 1:
-            st.success(f"✅ Đã upload thành công: {saved_files[0]}")
-        else:
-            st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
-        st.rerun()
+        if new_files:
+            # Handle multiple files
+            saved_files = []
+            for uploaded_file in new_files:
+                try:
+                    # Check if file already exists
+                    file_path = storage_dir / uploaded_file.name
+                    if file_path.exists():
+                        st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
+                    
+                    # Save file
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Get file type
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    # Save metadata
+                    file_info = save_step_template_info(step_num, uploaded_file.name, file_type, storage_dir)
+                    saved_files.append(uploaded_file.name)
+                    # Mark as processed
+                    st.session_state[upload_key].append(uploaded_file.name)
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi upload file {uploaded_file.name}: {str(e)}")
+            
+            if saved_files:
+                if len(saved_files) == 1:
+                    st.success(f"✅ Đã upload thành công: {saved_files[0]}")
+                else:
+                    st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
+                st.rerun()
+    elif uploaded_files is not None and len(uploaded_files) == 0:
+        # Reset processed files list when uploader is cleared
+        st.session_state[upload_key] = []
     
     # File list
     metadata = load_step_template_metadata(storage_dir)
@@ -1055,31 +1117,51 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
         key=f"{key_prefix}_upload"
     )
     
-    if uploaded_files is not None and len(uploaded_files) > 0:
-        # Handle multiple files
-        saved_files = []
-        for uploaded_file in uploaded_files:
-            # Check if file already exists
-            file_path = storage_dir / uploaded_file.name
-            if file_path.exists():
-                st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
-            
-            # Save file
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Get file type
-            file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
-            
-            # Save metadata
-            file_info = save_completed_file_info(step_num, uploaded_file.name, file_type, storage_dir, substep_code)
-            saved_files.append(uploaded_file.name)
+    # Initialize session state for tracking uploaded files
+    upload_key = f"completed_uploaded_{key_prefix}"
+    if upload_key not in st.session_state:
+        st.session_state[upload_key] = []
+    
+    # Check if new files were uploaded
+    if uploaded_files and len(uploaded_files) > 0:
+        # Get list of new file names (not yet processed)
+        processed_files = st.session_state[upload_key]
+        new_files = [f for f in uploaded_files if f.name not in processed_files]
         
-        if len(saved_files) == 1:
-            st.success(f"✅ Đã upload file hoàn thành: {saved_files[0]}")
-        else:
-            st.success(f"✅ Đã upload thành công {len(saved_files)} file hoàn thành: {', '.join(saved_files)}")
-        st.rerun()
+        if new_files:
+            # Handle multiple files
+            saved_files = []
+            for uploaded_file in new_files:
+                try:
+                    # Check if file already exists
+                    file_path = storage_dir / uploaded_file.name
+                    if file_path.exists():
+                        st.warning(f"⚠️ File {uploaded_file.name} đã tồn tại, sẽ được ghi đè.")
+                    
+                    # Save file
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Get file type
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    # Save metadata
+                    file_info = save_completed_file_info(step_num, uploaded_file.name, file_type, storage_dir, substep_code)
+                    saved_files.append(uploaded_file.name)
+                    # Mark as processed
+                    st.session_state[upload_key].append(uploaded_file.name)
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi upload file {uploaded_file.name}: {str(e)}")
+            
+            if saved_files:
+                if len(saved_files) == 1:
+                    st.success(f"✅ Đã upload file hoàn thành: {saved_files[0]}")
+                else:
+                    st.success(f"✅ Đã upload thành công {len(saved_files)} file hoàn thành: {', '.join(saved_files)}")
+                st.rerun()
+    elif uploaded_files is not None and len(uploaded_files) == 0:
+        # Reset processed files list when uploader is cleared
+        st.session_state[upload_key] = []
     
     # File list
     metadata = load_completed_file_metadata(storage_dir)
