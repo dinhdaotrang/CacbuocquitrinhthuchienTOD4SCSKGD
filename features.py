@@ -885,8 +885,47 @@ def render_substep_templates(step_num, substep_code):
             if saved_files:
                 if len(saved_files) == 1:
                     st.success(f"✅ Đã upload thành công: {saved_files[0]}")
+                    # Show download button for just uploaded file
+                    uploaded_file = new_files[0]
+                    file_path = storage_dir / uploaded_file.name
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    col_up1, col_up2 = st.columns([3, 1])
+                    with col_up2:
+                        with open(file_path, "rb") as f:
+                            file_data = f.read()
+                            widget_uuid = str(uuid.uuid4())[:12]
+                            unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{widget_uuid}"
+                            st.download_button(
+                                label="⬇️ Tải xuống file vừa upload",
+                                data=file_data,
+                                file_name=uploaded_file.name,
+                                mime=file_type,
+                                key=unique_key,
+                                use_container_width=True
+                            )
                 else:
                     st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
+                    # Show download buttons for all uploaded files
+                    st.markdown("**Tải xuống các file vừa upload:**")
+                    cols = st.columns(min(len(saved_files), 3))
+                    for idx, filename in enumerate(saved_files):
+                        uploaded_file = new_files[idx]
+                        file_path = storage_dir / uploaded_file.name
+                        file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                        with cols[idx % 3]:
+                            with open(file_path, "rb") as f:
+                                file_data = f.read()
+                                widget_uuid = str(uuid.uuid4())[:12]
+                                unique_key = f"download_uploaded_substep_{step_num}_{substep_code}_{idx}_{widget_uuid}"
+                                st.download_button(
+                                    label=f"⬇️ {filename[:20]}...",
+                                    data=file_data,
+                                    file_name=filename,
+                                    mime=file_type,
+                                    key=unique_key,
+                                    use_container_width=True
+                                )
                 st.rerun()
     elif uploaded_files is not None and len(uploaded_files) == 0:
         # Reset processed files list when uploader is cleared
@@ -1009,8 +1048,47 @@ def render_step_templates(step_num):
             if saved_files:
                 if len(saved_files) == 1:
                     st.success(f"✅ Đã upload thành công: {saved_files[0]}")
+                    # Show download button for just uploaded file
+                    uploaded_file = new_files[0]
+                    file_path = storage_dir / uploaded_file.name
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    col_up1, col_up2 = st.columns([3, 1])
+                    with col_up2:
+                        with open(file_path, "rb") as f:
+                            file_data = f.read()
+                            widget_uuid = str(uuid.uuid4())[:12]
+                            unique_key = f"download_uploaded_step_{step_num}_{widget_uuid}"
+                            st.download_button(
+                                label="⬇️ Tải xuống file vừa upload",
+                                data=file_data,
+                                file_name=uploaded_file.name,
+                                mime=file_type,
+                                key=unique_key,
+                                use_container_width=True
+                            )
                 else:
                     st.success(f"✅ Đã upload thành công {len(saved_files)} file: {', '.join(saved_files)}")
+                    # Show download buttons for all uploaded files
+                    st.markdown("**Tải xuống các file vừa upload:**")
+                    cols = st.columns(min(len(saved_files), 3))
+                    for idx, filename in enumerate(saved_files):
+                        uploaded_file = new_files[idx]
+                        file_path = storage_dir / uploaded_file.name
+                        file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                        with cols[idx % 3]:
+                            with open(file_path, "rb") as f:
+                                file_data = f.read()
+                                widget_uuid = str(uuid.uuid4())[:12]
+                                unique_key = f"download_uploaded_step_{step_num}_{idx}_{widget_uuid}"
+                                st.download_button(
+                                    label=f"⬇️ {filename[:20]}...",
+                                    data=file_data,
+                                    file_name=filename,
+                                    mime=file_type,
+                                    key=unique_key,
+                                    use_container_width=True
+                                )
                 st.rerun()
     elif uploaded_files is not None and len(uploaded_files) == 0:
         # Reset processed files list when uploader is cleared
@@ -1217,8 +1295,47 @@ def render_completed_file_upload(step_num, substep_code=None, substep_content=""
             if saved_files:
                 if len(saved_files) == 1:
                     st.success(f"✅ Đã upload file hoàn thành: {saved_files[0]}")
+                    # Show download button for just uploaded file
+                    uploaded_file = new_files[0]
+                    file_path = storage_dir / uploaded_file.name
+                    file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                    
+                    col_up1, col_up2 = st.columns([3, 1])
+                    with col_up2:
+                        with open(file_path, "rb") as f:
+                            file_data = f.read()
+                            widget_uuid = str(uuid.uuid4())[:12]
+                            unique_key = f"download_uploaded_completed_{key_prefix}_{widget_uuid}"
+                            st.download_button(
+                                label="⬇️ Tải xuống file vừa upload",
+                                data=file_data,
+                                file_name=uploaded_file.name,
+                                mime=file_type,
+                                key=unique_key,
+                                use_container_width=True
+                            )
                 else:
                     st.success(f"✅ Đã upload thành công {len(saved_files)} file hoàn thành: {', '.join(saved_files)}")
+                    # Show download buttons for all uploaded files
+                    st.markdown("**Tải xuống các file vừa upload:**")
+                    cols = st.columns(min(len(saved_files), 3))
+                    for idx, filename in enumerate(saved_files):
+                        uploaded_file = new_files[idx]
+                        file_path = storage_dir / uploaded_file.name
+                        file_type = uploaded_file.type if hasattr(uploaded_file, 'type') else 'unknown'
+                        with cols[idx % 3]:
+                            with open(file_path, "rb") as f:
+                                file_data = f.read()
+                                widget_uuid = str(uuid.uuid4())[:12]
+                                unique_key = f"download_uploaded_completed_{key_prefix}_{idx}_{widget_uuid}"
+                                st.download_button(
+                                    label=f"⬇️ {filename[:20]}...",
+                                    data=file_data,
+                                    file_name=filename,
+                                    mime=file_type,
+                                    key=unique_key,
+                                    use_container_width=True
+                                )
                 st.rerun()
     elif uploaded_files is not None and len(uploaded_files) == 0:
         # Reset processed files list when uploader is cleared
