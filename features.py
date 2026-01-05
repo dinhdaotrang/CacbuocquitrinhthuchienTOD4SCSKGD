@@ -977,16 +977,23 @@ def render_substep_templates(step_num, substep_code):
             
             with col_download:
                 if file_exists:
-                    with open(file_path_obj, 'rb') as f:
-                        # Use combined key with timestamp for absolute uniqueness
-                        st.download_button(
-                            label="📥 Tải",
-                            data=f.read(),
-                            file_name=file_info['filename'],
-                            mime=file_info.get('file_type', 'application/octet-stream'),
-                            key=download_key,
-                            use_container_width=True
-                        )
+                    try:
+                        with open(file_path_obj, 'rb') as f:
+                            file_data = f.read()
+                            # Use combined key with timestamp for absolute uniqueness
+                            st.download_button(
+                                label="📥 Tải",
+                                data=file_data,
+                                file_name=file_info['filename'],
+                                mime=file_info.get('file_type', 'application/octet-stream'),
+                                key=download_key,
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.error(f"Không thể đọc file: {str(e)}")
+                        st.button("📥 Tải", key=f"{download_key}_disabled", disabled=True, use_container_width=True)
+                else:
+                    st.button("📥 Tải", key=f"{download_key}_disabled", disabled=True, use_container_width=True, help="File không tồn tại")
             
             with col_delete:
                 if st.button("🗑️ Xóa", key=delete_key, use_container_width=True):
